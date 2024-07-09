@@ -11,18 +11,22 @@ import jade.domain.FIPAException;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.carol.tfm.domain.capabilities.basic_water_manager.BasicManageDamCapability;
+import org.carol.tfm.domain.ontology.configs.ReservoirConfig;
 
+import java.util.Optional;
 import java.util.Random;
 
 public class Reservoir extends SingleCapabilityAgent {
     private final Random rand;
     private final String basin_id;
     private final Log log = LogFactory.getLog(this.getClass());
+    private final Optional<ReservoirConfig> config;
 
-    public Reservoir(String basin_id, BasicManageDamCapability basicManageDamCapability) {
+    public Reservoir(String basin_id, Optional<ReservoirConfig> config, BasicManageDamCapability basicManageDamCapability) {
         super(basicManageDamCapability);
         this.rand = new Random(System.currentTimeMillis());
         this.basin_id = basin_id;
+        this.config = config;
     }
 
     @Override

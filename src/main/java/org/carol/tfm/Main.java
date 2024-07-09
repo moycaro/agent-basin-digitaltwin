@@ -1,5 +1,8 @@
 package org.carol.tfm;
 
+import bdi4jade.belief.BeliefBase;
+import bdi4jade.event.GoalEvent;
+import bdi4jade.event.GoalListener;
 import jade.BootProfileImpl;
 import jade.core.ProfileImpl;
 import jade.wrapper.AgentContainer;
@@ -17,11 +20,17 @@ import org.carol.tfm.agents.planner.SynchronizatorAgent;
 import org.carol.tfm.domain.capabilities.basic_water_manager.BasicManageDamCapability;
 import org.carol.tfm.agents.reservoir.Reservoir;
 import org.carol.tfm.agents.StoreDataAgent;
+import org.carol.tfm.domain.capabilities.timestep_management.TimeStepManagementCapability;
+import org.carol.tfm.domain.capabilities.timestep_management.goals.NextStepGoal;
+import org.carol.tfm.domain.ontology.BasinDefinition;
+import org.carol.tfm.domain.ontology.configs.PluviometerConfig;
+import org.carol.tfm.domain.ontology.configs.ReservoirConfig;
 
 import java.time.Duration;
 import java.util.*;
+import java.util.stream.Collectors;
 
-public class Main   {
+public class Main {
 
     public static void main(String[] args) throws Exception {
         LoggerContext context = (org.apache.logging.log4j.core.LoggerContext)
@@ -37,10 +46,9 @@ public class Main   {
     private ProfileImpl bootProfile;
     private final Log log;
     private jade.core.Runtime runtime;
-    private final BasicManageDamCapability basicManageDamCapability;
-    private List<Reservoir> reservoir_agents;
-    private List<Pluvio> pluvio_agents;
-    public static final List<String> BASINS = List.of("basin_1");
+    private final Map<String, BeliefBase> basicManageDamCapability = new HashMap<>();
+    private List<Reservoir> reservoir_agents = new ArrayList<>();
+    private List<Pluvio> pluvio_agents = new ArrayList<>();
 
     public Main() {
         this.log = LogFactory.getLog(this.getClass());
@@ -57,55 +65,62 @@ public class Main   {
         this.runtime = jade.core.Runtime.instance();
         PlatformController controller = runtime
                 .createMainContainer(bootProfile);
+        //Capability para gestión del paso temporal
+        TimeStepManagementCapability timeStepManagementCapability = new TimeStepManagementCapability();
 
         try {
-            //shared between all reservoir agents
-            this.basicManageDamCapability = new BasicManageDamCapability();
-            this.reservoir_agents = new ArrayList<>();
-            this.pluvio_agents = new ArrayList<>();
-            StoreDataAgent storeDataAgent = new StoreDataAgent( this.basicManageDamCapability.getBeliefBase()  );
+            StoreDataAgent storeDataAgent = new StoreDataAgent( this.basicManageDamCapability );
             AgentController acStoreData = ((AgentContainer) controller).acceptNewAgent("StoreData::", storeDataAgent );
             acStoreData.start();
 
-            SynchronizatorAgent synchronizatorAgent = new SynchronizatorAgent( this.basicManageDamCapability.getBeliefBase() );
+            for (String basin_id : BasinDefinition.BASINS) {
+                Optional<ReservoirConfig> reservoirConfigOpt = BasinDefinition.RESERVOIRS.containsKey( basin_id ) ? Optional.of( BasinDefinition.RESERVOIRS.get( basin_id ) ) : Optional.empty();
+                BasicManageDamCapability currentDamnCapability = new BasicManageDamCapability(basin_id, reservoirConfigOpt);
+
+                basicManageDamCapability.put( basin_id, currentDamnCapability.getBeliefBase());
+                Reservoir reservoir = new Reservoir(basin_id, reservoirConfigOpt ,  currentDamnCapability);
+                AgentController basin_reservoir = ((AgentContainer) controller).acceptNewAgent("Reservoir::" + basin_id, reservoir );
+                reservoir_agents.add(  reservoir );
+                basin_reservoir.start();
+
+                Pluvio pluvio = null;
+                if ( BasinDefinition.PLUVIOS.containsKey( basin_id ) ) {
+                    PluviometerConfig config =  BasinDefinition.PLUVIOS.get( basin_id );
+                    pluvio = new Pluvio( basin_id, config, timeStepManagementCapability.getBeliefBase() );
+                    AgentController basin_pluvio = ((AgentContainer) controller).acceptNewAgent(config.sensor_id,  pluvio);
+                    pluvio_agents.add( pluvio );
+                    basin_pluvio.start();
+                    timeStepManagementCapability.getBeliefBase().addBeliefListener(pluvio);
+                }
+
+                FlowGauge flowGauge = null;
+                if ( BasinDefinition.GAUGES.containsKey( basin_id ) ) {
+                    flowGauge = new FlowGauge( basin_id, BasinDefinition.GAUGES.get( basin_id ) );
+                    AgentController basin_flow_gauge = ((AgentContainer) controller).acceptNewAgent("Gauge::Flow::" + basin_id,  flowGauge);
+                    currentDamnCapability.getBeliefBase().addBeliefListener(flowGauge);
+                    basin_flow_gauge.start();
+                }
+            }
+
+            SynchronizatorAgent synchronizatorAgent = new SynchronizatorAgent( timeStepManagementCapability );
             AgentController acSynchornizator = ((AgentContainer) controller).acceptNewAgent("Synchronizator::", synchronizatorAgent );
             acSynchornizator.start();
 
-            BasicPlanner basicPlanner = new BasicPlanner( this.reservoir_agents, this.basicManageDamCapability.getBeliefBase() );
+            BasicPlanner basicPlanner = new BasicPlanner( this.reservoir_agents, this.basicManageDamCapability, timeStepManagementCapability.getBeliefBase() );
             AgentController acBasicPlanner = ((AgentContainer) controller).acceptNewAgent("Planner::Basic", basicPlanner );
 
-            this.basicManageDamCapability.getBeliefBase().addBeliefListener(basicPlanner);
+            this.basicManageDamCapability.values().stream().forEach(believeBase -> believeBase.addBeliefListener(basicPlanner) );
             acBasicPlanner.start();
-
-            for (String basin_id : BASINS) {
-                Pluvio pluvio = new Pluvio( basin_id );
-                Reservoir reservoir = new Reservoir(basin_id,this.basicManageDamCapability);
-                FlowGauge flowGauge = new FlowGauge( basin_id, new float[] {30f, 40f, 50f, 60f, 70f} );
-                AgentController basin_pluvio = ((AgentContainer) controller).acceptNewAgent("Gauge::Pluvio::" + basin_id,  pluvio);
-                AgentController basin_reservoir = ((AgentContainer) controller).acceptNewAgent("Reservoir::" + basin_id, reservoir );
-                AgentController basin_flow_gauge = ((AgentContainer) controller).acceptNewAgent("Gauge::Flow::" + basin_id,  flowGauge);
-
-                reservoir_agents.add(  reservoir );
-                pluvio_agents.add( pluvio );
-
-                this.basicManageDamCapability.getBeliefBase().addBeliefListener(pluvio);
-                this.basicManageDamCapability.getBeliefBase().addBeliefListener(flowGauge);
-
-                basin_pluvio.start();
-                basin_reservoir.start();
-                basin_flow_gauge.start();
-            }
-
 
             log.info("*************************************************************************************");
             log.info("********** STEP: " + 0);
             Thread.sleep( Duration.ofSeconds(2));
-            this.basicManageDamCapability.getBeliefBase().updateBelief("time_step",  0 );
+
+            synchronizatorAgent.addGoal( new NextStepGoal(), synchronizatorAgent );
         } catch (StaleProxyException e) {
             throw new RuntimeException(e);
         } catch (InterruptedException e) {
             throw new RuntimeException(e);
         }
-
     }
 }

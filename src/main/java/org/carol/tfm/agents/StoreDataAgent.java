@@ -15,13 +15,14 @@ import org.apache.commons.logging.LogFactory;
 import org.carol.tfm.domain.capabilities.basic_water_manager.beliefs.BasinInflow;
 import org.carol.tfm.domain.capabilities.basic_water_manager.beliefs.BeliefNames;
 
+import java.util.Map;
 import java.util.Set;
 
 public class StoreDataAgent extends Agent {
     private final Log log = LogFactory.getLog(this.getClass());
-    private final BeliefBase beliefBase;
+    private final Map<String, BeliefBase> beliefBase;
 
-    public StoreDataAgent(BeliefBase beliefBase) {
+    public StoreDataAgent(Map<String, BeliefBase> beliefBase) {
         super();
         this.beliefBase = beliefBase;
     }
@@ -59,18 +60,9 @@ public class StoreDataAgent extends Agent {
                 final String[] msgTokens = msg.getContent().split("@@");
                 final String basinId = msgTokens[0];
                 final Float rainfall = Float.parseFloat( msgTokens[1]);
-
-                log.trace("[StoreData] New value received from RainGauge in basin " + basinId+ " " + rainfall + "mm.");
-
-                BeliefSet<String, BasinInflow> basinsInflowBeliefSet = (BeliefSet<String, BasinInflow>) beliefBase
-                        .getBelief(BeliefNames.BASIN_INFLOW);
-
-                Set<BasinInflow> modifiedBeliefeSet = basinsInflowBeliefSet.getValue();
-                modifiedBeliefeSet.stream().filter( basinInflow -> basinInflow.getBasin_id().equals( basinId ))
-                        .findAny().get().setMm( rainfall );
-
-                basinsInflowBeliefSet.setValue( modifiedBeliefeSet );
-                log.trace("[StoreData] BasinInflow belief updated.");
+                log.trace("[StoreData] New value received from RainGauge in basin " + basinId + " " + rainfall + "mm.");
+                beliefBase.get(basinId).updateBelief(BeliefNames.BASIN_INFLOW, rainfall );
+                log.info("[StoreData] BasinInflow for " + basinId + " belief updated.");
             } else {
                 block();
             }

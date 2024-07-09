@@ -9,7 +9,10 @@ import bdi4jade.extension.planselection.utilitybased.SoftgoalPreferences;
 
 import bdi4jade.goal.Goal;
 import bdi4jade.plan.DefaultPlan;
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
 import org.carol.tfm.Main;
+import org.carol.tfm.agents.reservoir.goals.NaturalRegimeGoal;
 import org.carol.tfm.agents.reservoir.goals.ReleaseWaterGoal;
 import org.carol.tfm.agents.reservoir.goals.StorageWaterGoal;
 import org.carol.tfm.domain.capabilities.basic_water_manager.beliefs.BasinInflow;
@@ -17,20 +20,24 @@ import org.carol.tfm.domain.capabilities.basic_water_manager.beliefs.BasinOutflo
 import org.carol.tfm.domain.capabilities.basic_water_manager.beliefs.BasinStatus;
 import org.carol.tfm.domain.capabilities.basic_water_manager.beliefs.BeliefNames;
 import org.carol.tfm.domain.capabilities.basic_water_manager.plans.InputOutputPlanBody;
+import org.carol.tfm.domain.capabilities.basic_water_manager.plans.NaturalRegimePlanBody;
 import org.carol.tfm.domain.capabilities.basic_water_manager.plans.StorageWaterPlanBody;
 import org.carol.tfm.domain.entities.Damn;
+import org.carol.tfm.domain.ontology.BasinDefinition;
+import org.carol.tfm.domain.ontology.configs.ReservoirConfig;
+
+import java.util.Optional;
 
 public class BasicManageDamCapability extends Capability {
+    private static final Log log = LogFactory.getLog(BasicManageDamCapability.class);
     @Belief
-    private BeliefSet<String, BasinStatus> basinStatus = new TransientBeliefSet<>(BeliefNames.BASIN_STATUS);
+    private BasinStatus.BASIN_STATUS_TYPES basin_status;
     @Belief
-    private BeliefSet<String, BasinInflow> basinInflow = new TransientBeliefSet<>(BeliefNames.BASIN_INFLOW);
+    private Float basin_inflow;
     @Belief
-    private BeliefSet<String, BasinOutflow> basinOutflow = new TransientBeliefSet<>(BeliefNames.BASIN_OUTFLOW);
+    private Float basin_outflow;
     @Belief
-    private BeliefSet<String, Damn> damnBeliefSet = new TransientBeliefSet<>(BeliefNames.DAMN_STATUS);
-    @Belief
-    private Integer time_step;
+    private Damn damn_status;
 
     @Plan
     private bdi4jade.plan.Plan inputOutputPlan;
@@ -38,7 +45,16 @@ public class BasicManageDamCapability extends Capability {
     @Plan
     private bdi4jade.plan.Plan storageWaterPlan;
 
-    public BasicManageDamCapability() {
+    @Plan
+    private bdi4jade.plan.Plan regimeNaturalPlan;
+
+    Optional<ReservoirConfig> reservoirConfig;
+    String basin_id;
+
+    public BasicManageDamCapability(String basin_id, Optional<ReservoirConfig> config) {
+        this.basin_id = basin_id;
+        this.reservoirConfig = config;
+
         this.inputOutputPlan = new DefaultPlan(ReleaseWaterGoal.class,
                 InputOutputPlanBody.class) {
             @Override
@@ -47,19 +63,22 @@ public class BasicManageDamCapability extends Capability {
             }
         };
         this.storageWaterPlan = new DefaultPlan(StorageWaterGoal.class, StorageWaterPlanBody.class);
+        this.regimeNaturalPlan = new DefaultPlan(NaturalRegimeGoal.class, NaturalRegimePlanBody.class);
     }
 
     @Override
     protected void setup() {
-        time_step = 0;
-
         //HOTstart = false
-        Main.BASINS.forEach( basin -> {
-            basinStatus.addValue( new BasinStatus(basin, BasinStatus.BASIN_STATUS_TYPES.SCARCITY));
-            basinInflow.addValue(  new BasinInflow(basin , 0));
-            basinOutflow.addValue(  new BasinOutflow(basin , 0));
+        this.basin_status = BasinStatus.BASIN_STATUS_TYPES.SCARCITY;
+        this.basin_inflow = 0f;
+        this.basin_outflow = 0f;
+        if ( this.reservoirConfig.isEmpty() ) {
+            log.warn(" La cuenca " + this.basin_id + " no tiene elementos de gestión.");
+            this.damn_status = null;
+        } else {
+            this.damn_status = new Damn( basin_id, this.reservoirConfig.get().volumen_total, 0 );
+        }
 
-            damnBeliefSet.addValue( new Damn(basin, 200, 0));
-        });
+        this.beliefBase.getBelief( BeliefNames.BASIN_INFLOW ).putMetadata("basin_id", this.basin_id );
     }
 }

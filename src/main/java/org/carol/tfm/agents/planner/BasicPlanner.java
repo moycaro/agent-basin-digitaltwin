@@ -23,6 +23,7 @@ import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.carol.tfm.Main;
 import org.carol.tfm.agents.reservoir.Reservoir;
+import org.carol.tfm.agents.reservoir.goals.NaturalRegimeGoal;
 import org.carol.tfm.agents.reservoir.goals.ReleaseWaterGoal;
 import org.carol.tfm.agents.reservoir.goals.StorageWaterGoal;
 import org.carol.tfm.domain.capabilities.basic_water_manager.beliefs.BasinInflow;
@@ -30,23 +31,23 @@ import org.carol.tfm.domain.capabilities.basic_water_manager.beliefs.BasinOutflo
 import org.carol.tfm.domain.capabilities.basic_water_manager.beliefs.BasinStatus;
 import org.carol.tfm.domain.capabilities.basic_water_manager.beliefs.BeliefNames;
 import org.carol.tfm.domain.entities.Damn;
+import org.carol.tfm.domain.ontology.BasinDefinition;
 
 import java.io.ObjectOutputStream;
-import java.util.Arrays;
-import java.util.Base64;
-import java.util.List;
-import java.util.Random;
+import java.util.*;
 
 public class BasicPlanner extends Agent implements GoalListener, BeliefListener {
     private final Log log = LogFactory.getLog(this.getClass());
-    private final BeliefBase beliefBase;
+    private final Map<String, BeliefBase> beliefBase;
     private List<Reservoir> reservoir_agents;
     private AID synchronizatorAID;
+    private final BeliefBase timeStepBelieveBase;
 
-    public BasicPlanner(List<Reservoir> reservoir_agents, BeliefBase beliefBase) {
+    public BasicPlanner(List<Reservoir> reservoir_agents, Map<String, BeliefBase> beliefBase, BeliefBase timeStepBelieveBase) {
         super();
         this.beliefBase = beliefBase;
         this.reservoir_agents = reservoir_agents;
+        this.timeStepBelieveBase = timeStepBelieveBase;
     }
 
     // Put agent initializations here
@@ -113,7 +114,8 @@ public class BasicPlanner extends Agent implements GoalListener, BeliefListener 
         if ( beliefEvent.getAction().equals( BeliefEvent.Action.BELIEF_UPDATED )) {
             if ( beliefEvent.getBelief().getName().equals(BeliefNames.BASIN_INFLOW ) ) {
                 log.info( "[BASIC PLANNER] New Inflow data received: Updating plan");
-                manageBeliefChange( );
+                //Float rainfall = (Float) beliefEvent.getBelief().getValue();
+                manageBeliefChange( (String) beliefEvent.getBelief().getMetadata("basin_id") );
             } else if ( beliefEvent.getBelief().getName().equals(BeliefNames.TIME_STEP ) ) {
                 log.info( "[BASIC PLANNER] All basins can execute their plan -> Waiting for Next step");
             }
@@ -143,7 +145,8 @@ public class BasicPlanner extends Agent implements GoalListener, BeliefListener 
 
             //CAmbiaré parámetros del planner para decidir cómo ejecutarlo y adelante, le tendré que actualizar al inflow de la cuenca
                 //el agua que sale de la anterior
-            manageBeliefChange();
+            StorageWaterGoal storageWaterGoal = (StorageWaterGoal) goal;
+            manageBeliefChange( storageWaterGoal.getDamn().getBasin_id() );
         }
     }
 
@@ -151,27 +154,34 @@ public class BasicPlanner extends Agent implements GoalListener, BeliefListener 
         Ha cambiado algo en el estado de alguna cuenca y tengo por tanto que estudiarlo para poder definir qué GOALS asignar a cada uno
         de mis embalses
      */
-    private void manageBeliefChange() {
-        BeliefSet<String, BasinInflow> basinsInflowBeliefSet = (BeliefSet<String, BasinInflow>) beliefBase
+    private void manageBeliefChange(String basin_id ) {
+        /*Float basinsInflowBeliefSet = (BeliefSet<String, BasinInflow>) beliefBase.get( basin_id )
                 .getBelief(BeliefNames.BASIN_INFLOW);
-        BeliefSet<String, BasinOutflow> basinsOutflowBeliefSet = (BeliefSet<String, BasinOutflow>) beliefBase
+        BeliefSet<String, BasinOutflow> basinsOutflowBeliefSet = (BeliefSet<String, BasinOutflow>) beliefBase.get( basin_id )
                 .getBelief(BeliefNames.BASIN_OUTFLOW);
-        BeliefSet<String, BasinStatus> basinsStatusBeliefSet = (BeliefSet<String, BasinStatus>) beliefBase
+        BeliefSet<String, BasinStatus> basinsStatusBeliefSet = (BeliefSet<String, BasinStatus>) beliefBase.get( basin_id )
                 .getBelief(BeliefNames.BASIN_STATUS);
-        BeliefSet<String, Damn> damnBeliefSet = (BeliefSet<String, Damn>) beliefBase
+        BeliefSet<String, Damn> damnBeliefSet = (BeliefSet<String, Damn>) beliefBase.get( basin_id )
                 .getBelief(BeliefNames.DAMN_STATUS);
-        Integer time_step = (Integer) beliefBase.getBelief("time_step").getValue();
+*/
+        Integer time_step = (Integer) timeStepBelieveBase.getBelief(BeliefNames.TIME_STEP).getValue();
 
-        Main.BASINS.forEach( basin -> {BasinInflow myInflow = basinsInflowBeliefSet.getValue().stream().filter( inflow -> inflow.getBasin_id().equals( basin )).findAny().get();
-            BasinStatus myStatus = basinsStatusBeliefSet.getValue().stream().filter( inflow -> inflow.getBasin_id().equals( basin )).findAny().get();
-            Damn myDamn = damnBeliefSet.getValue().stream().filter( inflow -> inflow.getBasin_id().equals( basin )).findAny().get();
-
+        BasinDefinition.BASINS.forEach(basin -> {
+            Float myInflow = (Float) this.beliefBase.get( basin ).getBelief( BeliefNames.BASIN_INFLOW ).getValue();
+            BasinStatus.BASIN_STATUS_TYPES myStatus = (BasinStatus.BASIN_STATUS_TYPES) this.beliefBase.get( basin ).getBelief( BeliefNames.BASIN_STATUS ).getValue();
+            Damn myDamn = null;
+            if ( this.beliefBase.get( basin ).getBelief( BeliefNames.DAMN_STATUS ) != null ) {
+                myDamn = (Damn) this.beliefBase.get( basin ).getBelief( BeliefNames.DAMN_STATUS ).getValue();
+            }
             Reservoir myReservoir = this.reservoir_agents.stream().filter(r -> r.getBasin_id().equals( basin )).findAny().get();
 
-            if ( myStatus.getCurrent_status().equals( BasinStatus.BASIN_STATUS_TYPES.FLOOD ) ) {
-                myReservoir.addGoal( new ReleaseWaterGoal( myDamn, myInflow.getMm(), time_step ), this );
+            if ( myDamn == null ) {
+                //no tengo elemento de regulacion => regimen natural
+                myReservoir.addGoal( new NaturalRegimeGoal( basin, myInflow, time_step ), this );
+            } else if ( myStatus.equals( BasinStatus.BASIN_STATUS_TYPES.FLOOD ) ) {
+                myReservoir.addGoal( new ReleaseWaterGoal( myDamn, myInflow, time_step ), this );
             } else {
-                myReservoir.addGoal( new StorageWaterGoal( myDamn, myInflow.getMm(), time_step ), this );
+                myReservoir.addGoal( new StorageWaterGoal( myDamn, myInflow, time_step ), this );
             }
 
         } );

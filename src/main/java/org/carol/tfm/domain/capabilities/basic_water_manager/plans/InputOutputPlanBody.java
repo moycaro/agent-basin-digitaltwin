@@ -25,11 +25,11 @@ public class InputOutputPlanBody extends AbstractPlanBody {
     private final Log log = LogFactory.getLog(this.getClass());
 
     @Belief(name = BeliefNames.BASIN_STATUS)
-    private BeliefSet<String, BasinStatus> basinStatus;
+    private BasinStatus.BASIN_STATUS_TYPES basinStatus;
     @Belief(name = BeliefNames.BASIN_INFLOW)
-    private BeliefSet<String, BasinInflow> basinInflow;
+    private Float basinInflow;
     @Belief(name = BeliefNames.BASIN_OUTFLOW)
-    private BeliefSet<String, BasinOutflow> basinOutflow;
+    private Float basinOutflow;
 
     private Damn damn;
     private float currentInflow;
@@ -37,7 +37,6 @@ public class InputOutputPlanBody extends AbstractPlanBody {
     @Override
     public void action() {
         //INPUT paso anterior y estado actual
-        BasinStatus myBasinStatus = basinStatus.getValue().stream().filter( status -> status.getBasin_id().equals( this.damn.getBasin_id())).findAny().get();
 /*
         if ( myBasinStatus.getCurrent_status().equals( BasinStatus.BASIN_STATUS_TYPES.FLOOD ) ) {
             log.info("I/O PLan failed because current basin is in Flood alarm: " + this.damn.toString() );
@@ -47,14 +46,11 @@ public class InputOutputPlanBody extends AbstractPlanBody {
  */
             log.info("Actualizando salida del embalse " + this.damn.getBasin_id() + " " + currentInflow);
             //OUTPUT estado siguiente => Las entradas pasan a ser salidas
-            BasinOutflow myasinOutflow = basinOutflow.getValue().stream().filter( status -> status.getBasin_id().equals( this.damn.getBasin_id())).findAny().get();
 
             ReleaseWaterGoal releaseWaterGoal = ( ReleaseWaterGoal ) this.getGoal();
             releaseWaterGoal.setOutflow( currentInflow );
 
-            Set<BasinOutflow> modifiedOutflowBeliefeSet = basinOutflow.getValue();
-            modifiedOutflowBeliefeSet.stream().filter( basinOutflow -> basinOutflow.getBasin_id().equals( this.damn.getBasin_id() ))
-                    .findAny().get().setMm( currentInflow );
+            this.getBeliefBase().updateBelief( BeliefNames.BASIN_OUTFLOW, currentInflow);
 
             boolean isSafe = askFLowGauges( releaseWaterGoal.getOutflow(), releaseWaterGoal.getDamn().getBasin_id() );
 

@@ -10,17 +10,18 @@ import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.carol.tfm.domain.capabilities.basic_water_manager.beliefs.BasinOutflow;
 import org.carol.tfm.domain.capabilities.basic_water_manager.beliefs.BeliefNames;
+import org.carol.tfm.domain.ontology.configs.FlowGaugeConfig;
 
 public class FlowGauge extends Agent implements BeliefListener  {
     private final Log log = LogFactory.getLog(this.getClass());
 
     private AID[] plannerAgents;
     private final String basin_id;
-    private final float[] percentiles;
-    public FlowGauge(String basin_id, float[] percentiles) {
+    private final FlowGaugeConfig config;
+    public FlowGauge(String basin_id, FlowGaugeConfig config) {
         super();
         this.basin_id = basin_id;
-        this.percentiles = percentiles;
+        this.config = config;
     }
 
     // Put agent initializations here
