@@ -2,28 +2,21 @@ package org.carol.tfm.domain.capabilities.basic_water_manager;
 
 import bdi4jade.annotation.Belief;
 import bdi4jade.annotation.Plan;
-import bdi4jade.belief.BeliefSet;
-import bdi4jade.belief.TransientBeliefSet;
 import bdi4jade.core.Capability;
-import bdi4jade.extension.planselection.utilitybased.SoftgoalPreferences;
 
 import bdi4jade.goal.Goal;
 import bdi4jade.plan.DefaultPlan;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
-import org.carol.tfm.Main;
 import org.carol.tfm.agents.reservoir.goals.NaturalRegimeGoal;
 import org.carol.tfm.agents.reservoir.goals.ReleaseWaterGoal;
 import org.carol.tfm.agents.reservoir.goals.StorageWaterGoal;
-import org.carol.tfm.domain.capabilities.basic_water_manager.beliefs.BasinInflow;
-import org.carol.tfm.domain.capabilities.basic_water_manager.beliefs.BasinOutflow;
 import org.carol.tfm.domain.capabilities.basic_water_manager.beliefs.BasinStatus;
 import org.carol.tfm.domain.capabilities.basic_water_manager.beliefs.BeliefNames;
-import org.carol.tfm.domain.capabilities.basic_water_manager.plans.InputOutputPlanBody;
+import org.carol.tfm.domain.capabilities.basic_water_manager.plans.ReleaseWaterPlanBody;
 import org.carol.tfm.domain.capabilities.basic_water_manager.plans.NaturalRegimePlanBody;
 import org.carol.tfm.domain.capabilities.basic_water_manager.plans.StorageWaterPlanBody;
 import org.carol.tfm.domain.entities.Damn;
-import org.carol.tfm.domain.ontology.BasinDefinition;
 import org.carol.tfm.domain.ontology.configs.ReservoirConfig;
 
 import java.util.Optional;
@@ -33,11 +26,13 @@ public class BasicManageDamCapability extends Capability {
     @Belief
     private BasinStatus.BASIN_STATUS_TYPES basin_status;
     @Belief
-    private Float basin_inflow;
+    private Float basin_rainfall;
     @Belief
     private Float basin_outflow;
     @Belief
     private Damn damn_status;
+    @Belief
+    private Float basin_inflow;
 
     @Plan
     private bdi4jade.plan.Plan inputOutputPlan;
@@ -56,7 +51,7 @@ public class BasicManageDamCapability extends Capability {
         this.reservoirConfig = config;
 
         this.inputOutputPlan = new DefaultPlan(ReleaseWaterGoal.class,
-                InputOutputPlanBody.class) {
+                ReleaseWaterPlanBody.class) {
             @Override
             public boolean isContextApplicable(Goal goal) {
                 return true;
@@ -70,6 +65,7 @@ public class BasicManageDamCapability extends Capability {
     protected void setup() {
         //HOTstart = false
         this.basin_status = BasinStatus.BASIN_STATUS_TYPES.SCARCITY;
+        this.basin_rainfall = 0f;
         this.basin_inflow = 0f;
         this.basin_outflow = 0f;
         if ( this.reservoirConfig.isEmpty() ) {
@@ -79,6 +75,9 @@ public class BasicManageDamCapability extends Capability {
             this.damn_status = new Damn( basin_id, this.reservoirConfig.get().volumen_total, 0 );
         }
 
-        this.beliefBase.getBelief( BeliefNames.BASIN_INFLOW ).putMetadata("basin_id", this.basin_id );
+        this.beliefBase.getBelief( BeliefNames.BASIN_INFLOW).putMetadata("basin_id", this.basin_id );
+        this.beliefBase.getBelief( BeliefNames.BASIN_OUTFLOW).putMetadata("basin_id", this.basin_id );
+        this.beliefBase.getBelief( BeliefNames.BASIN_RAINFALL).putMetadata("basin_id", this.basin_id );
+        this.beliefBase.getBelief( BeliefNames.BASIN_STATUS).putMetadata("basin_id", this.basin_id );
     }
 }

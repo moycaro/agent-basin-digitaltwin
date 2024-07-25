@@ -6,7 +6,7 @@ import org.carol.tfm.domain.entities.Damn;
 
 import java.io.Serializable;
 
-public class StorageWaterGoal implements Goal, Serializable {
+public class StorageWaterGoal implements Goal, Serializable, IBasinManagementGoal {
     private float currentInflow;
     private float outlow;
     private int time_step;
@@ -40,11 +40,18 @@ public class StorageWaterGoal implements Goal, Serializable {
         return "Perform STORAGE for inflow : " + currentInflow + " in " + damn.toString();
     }
 
+    @Parameter(direction = Parameter.Direction.IN)
     public int getTime_step() {
         return time_step;
     }
 
     public String getName() {
         return name;
+    }
+
+    @Parameter(direction = Parameter.Direction.IN)
+    @Override
+    public String getBasin_id() {
+        return this.damn.getBasin_id();
     }
 }

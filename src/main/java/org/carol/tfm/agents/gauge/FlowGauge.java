@@ -36,12 +36,13 @@ public class FlowGauge extends Agent implements BeliefListener  {
                 if (msg != null) {
                     if (msg.getPerformative() == ACLMessage.REQUEST) {
                         log.info( this.myAgent.getName() + " Checking for save outflow " + msg.getContent() );
-                        float outflow = Float.parseFloat(msg.getContent());
+                        float outflow = Float.parseFloat(msg.getContent()); // de la cuenca en m³/h
 
                         // Enviar una respuesta
                         ACLMessage reply = msg.createReply();
                         reply.setPerformative(ACLMessage.INFORM);
-                        reply.setContent( outflow > 50 ? "false" : "true" );
+                        float threshold = config.flow_threshold_info * 3600; //m³/sg * sg/h = m³/h
+                        reply.setContent( outflow > threshold ? "false" : "true" ); //ES SEGURO?
                         send(reply);
                     }
                 } else {

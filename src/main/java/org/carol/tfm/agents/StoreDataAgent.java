@@ -1,7 +1,6 @@
 package org.carol.tfm.agents;
 
 import bdi4jade.belief.BeliefBase;
-import bdi4jade.belief.BeliefSet;
 import jade.core.Agent;
 import jade.core.behaviours.CyclicBehaviour;
 import jade.domain.DFService;
@@ -12,11 +11,9 @@ import jade.lang.acl.ACLMessage;
 import jade.lang.acl.MessageTemplate;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
-import org.carol.tfm.domain.capabilities.basic_water_manager.beliefs.BasinInflow;
 import org.carol.tfm.domain.capabilities.basic_water_manager.beliefs.BeliefNames;
 
 import java.util.Map;
-import java.util.Set;
 
 public class StoreDataAgent extends Agent {
     private final Log log = LogFactory.getLog(this.getClass());
@@ -61,8 +58,7 @@ public class StoreDataAgent extends Agent {
                 final String basinId = msgTokens[0];
                 final Float rainfall = Float.parseFloat( msgTokens[1]);
                 log.trace("[StoreData] New value received from RainGauge in basin " + basinId + " " + rainfall + "mm.");
-                beliefBase.get(basinId).updateBelief(BeliefNames.BASIN_INFLOW, rainfall );
-                log.info("[StoreData] BasinInflow for " + basinId + " belief updated.");
+                beliefBase.get(basinId).updateBelief(BeliefNames.BASIN_RAINFALL, rainfall );
             } else {
                 block();
             }

@@ -12,6 +12,9 @@ import jade.lang.acl.MessageTemplate;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.carol.tfm.agents.reservoir.goals.GoalDeserializer;
+import org.carol.tfm.agents.reservoir.goals.NaturalRegimeGoal;
+import org.carol.tfm.agents.reservoir.goals.ReleaseWaterGoal;
+import org.carol.tfm.agents.reservoir.goals.StorageWaterGoal;
 import org.carol.tfm.domain.ontology.BasinDefinition;
 
 public class WaitForExecutionsPlanBody extends AbstractPlanBody {
@@ -30,8 +33,17 @@ public class WaitForExecutionsPlanBody extends AbstractPlanBody {
                 objectMapper.registerModule(module);
 
                 Goal achievedGoal = objectMapper.readValue(msg.getContent(), Goal.class);
+                String basin_id = "-";
+                if ( achievedGoal instanceof ReleaseWaterGoal ) {
+                    basin_id = ((ReleaseWaterGoal) achievedGoal).getBasin_id();
+                } else if ( achievedGoal instanceof NaturalRegimeGoal) {
+                    basin_id = ((NaturalRegimeGoal) achievedGoal).getBasin_id();
+                } else if ( achievedGoal instanceof StorageWaterGoal) {
+                    basin_id = ((StorageWaterGoal) achievedGoal).getDamn().getBasin_id();
+                }
 
-                log.trace("[STEP] Basin goal achieved  " );
+
+                log.info("\t [STEP] Basin goal achieved " + basin_id);
                 goals_achieved_in_current_timestep++;
                 if (goals_achieved_in_current_timestep == BasinDefinition.BASINS.size()) {
                     goals_achieved_in_current_timestep = 0;

@@ -29,6 +29,7 @@ import org.carol.tfm.domain.ontology.configs.PluviometerConfig;
 import java.io.BufferedReader;
 import java.io.InputStream;
 import java.io.InputStreamReader;
+import java.time.Duration;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.Arrays;
@@ -107,6 +108,7 @@ public class Pluvio extends Agent implements BeliefListener {
     public void eventOccurred(BeliefEvent beliefEvent) {
         if ( beliefEvent.getAction().equals( BeliefEvent.Action.BELIEF_UPDATED )) {
             if ( beliefEvent.getBelief().getName().equals(BeliefNames.TIME_STEP ) ) {
+                //Le doy un margen a que se entere también el otro servicio
                 sendDataBehaviour( (Integer) beliefEvent.getBelief().getValue() );
             }
         }
@@ -128,7 +130,7 @@ public class Pluvio extends Agent implements BeliefListener {
         try {
             Integer time_step = (Integer) beliefBase.getBelief( BeliefNames.TIME_STEP).getValue();
             LocalDate currentDate = BasinDefinition.INITIAL_DATE.plusDays(time_step.longValue() );
-            InputStream stream =  Main.class.getResourceAsStream("data/SPE00156018.csv");
+            InputStream stream =  Main.class.getResourceAsStream("data/" + this.config.sensor_id + ".csv");
             BufferedReader reader = new BufferedReader(new InputStreamReader(stream));
             while(reader.ready()) {
                 String line = reader.readLine();
@@ -150,7 +152,7 @@ public class Pluvio extends Agent implements BeliefListener {
             log.error("Can not get data file", ex);
         }
 
-        log.info( "\t\t [PLUVIO] " + config.sensor_id + " (v: " + rainfall + ") ");
+        log.info( "\t\t [PLUVIO] " + config.sensor_id + " (Rainfall (mm): " + rainfall + ") ");
         info.setContent( basin_id + "@@" +  rainfall);
         info.setConversationId("sensor-data");
 

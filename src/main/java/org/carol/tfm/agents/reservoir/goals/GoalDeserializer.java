@@ -34,7 +34,7 @@ public class GoalDeserializer extends StdDeserializer<Goal> {
         if (goalName.equals( ReleaseWaterGoal.class.getName() ) ) {
             ret = new ReleaseWaterGoal( deserializeDamn(node.get("damn") ) , currentInflow.floatValue() , timeStep);
         } else if (goalName.equals( StorageWaterGoal.class.getName() ) ) {
-            ret = new StorageWaterGoal( new Damn("",3f,3f), currentInflow.floatValue() , timeStep);
+            ret = new StorageWaterGoal( deserializeDamn(node.get("damn") ), currentInflow.floatValue() , timeStep);
         }
 
         return ret;

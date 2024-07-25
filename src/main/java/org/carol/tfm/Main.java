@@ -15,6 +15,7 @@ import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.core.LoggerContext;
 import org.carol.tfm.agents.gauge.FlowGauge;
 import org.carol.tfm.agents.gauge.Pluvio;
+import org.carol.tfm.agents.hydrology.HydrologyModelAgent;
 import org.carol.tfm.agents.planner.BasicPlanner;
 import org.carol.tfm.agents.planner.SynchronizatorAgent;
 import org.carol.tfm.domain.capabilities.basic_water_manager.BasicManageDamCapability;
@@ -23,8 +24,10 @@ import org.carol.tfm.agents.StoreDataAgent;
 import org.carol.tfm.domain.capabilities.timestep_management.TimeStepManagementCapability;
 import org.carol.tfm.domain.capabilities.timestep_management.goals.NextStepGoal;
 import org.carol.tfm.domain.ontology.BasinDefinition;
+import org.carol.tfm.domain.ontology.configs.FlowGaugeConfig;
 import org.carol.tfm.domain.ontology.configs.PluviometerConfig;
 import org.carol.tfm.domain.ontology.configs.ReservoirConfig;
+import org.carol.tfm.domain.services.DataExportService;
 
 import java.time.Duration;
 import java.util.*;
@@ -52,6 +55,8 @@ public class Main {
 
     public Main() {
         this.log = LogFactory.getLog(this.getClass());
+        DataExportService.initLogFiles();
+
       //  this.agentTestPanel = new PilotoPanel();
 
         List<String> params = new ArrayList<String>();
@@ -72,6 +77,11 @@ public class Main {
             StoreDataAgent storeDataAgent = new StoreDataAgent( this.basicManageDamCapability );
             AgentController acStoreData = ((AgentContainer) controller).acceptNewAgent("StoreData::", storeDataAgent );
             acStoreData.start();
+
+            HydrologyModelAgent hydrologyModelAgent = new HydrologyModelAgent( this.basicManageDamCapability );
+            AgentController acHydrologyModelAgent = ((AgentContainer) controller).acceptNewAgent("HydrologyModel::", hydrologyModelAgent );
+            acHydrologyModelAgent.start();
+
 
             for (String basin_id : BasinDefinition.BASINS) {
                 Optional<ReservoirConfig> reservoirConfigOpt = BasinDefinition.RESERVOIRS.containsKey( basin_id ) ? Optional.of( BasinDefinition.RESERVOIRS.get( basin_id ) ) : Optional.empty();
@@ -95,8 +105,9 @@ public class Main {
 
                 FlowGauge flowGauge = null;
                 if ( BasinDefinition.GAUGES.containsKey( basin_id ) ) {
-                    flowGauge = new FlowGauge( basin_id, BasinDefinition.GAUGES.get( basin_id ) );
-                    AgentController basin_flow_gauge = ((AgentContainer) controller).acceptNewAgent("Gauge::Flow::" + basin_id,  flowGauge);
+                    FlowGaugeConfig config =  BasinDefinition.GAUGES.get( basin_id );
+                    flowGauge = new FlowGauge( basin_id, config );
+                    AgentController basin_flow_gauge = ((AgentContainer) controller).acceptNewAgent(config.sensor_id,  flowGauge);
                     currentDamnCapability.getBeliefBase().addBeliefListener(flowGauge);
                     basin_flow_gauge.start();
                 }
@@ -108,14 +119,15 @@ public class Main {
 
             BasicPlanner basicPlanner = new BasicPlanner( this.reservoir_agents, this.basicManageDamCapability, timeStepManagementCapability.getBeliefBase() );
             AgentController acBasicPlanner = ((AgentContainer) controller).acceptNewAgent("Planner::Basic", basicPlanner );
+            //timeStepManagementCapability.getBeliefBase().addBeliefListener(basicPlanner);
 
-            this.basicManageDamCapability.values().stream().forEach(believeBase -> believeBase.addBeliefListener(basicPlanner) );
+            this.basicManageDamCapability.values().stream().forEach(believeBase -> {
+                    believeBase.addBeliefListener(basicPlanner);
+                    believeBase.addBeliefListener(hydrologyModelAgent);
+            } );
             acBasicPlanner.start();
 
-            log.info("*************************************************************************************");
-            log.info("********** STEP: " + 0);
             Thread.sleep( Duration.ofSeconds(2));
-
             synchronizatorAgent.addGoal( new NextStepGoal(), synchronizatorAgent );
         } catch (StaleProxyException e) {
             throw new RuntimeException(e);
