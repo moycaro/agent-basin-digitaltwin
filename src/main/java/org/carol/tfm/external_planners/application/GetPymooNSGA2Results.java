@@ -15,37 +15,52 @@ import org.carol.tfm.external_planners.domain.entities.ExternalPlannerResponse;
 import java.io.*;
 import java.net.URL;
 import java.nio.channels.FileChannel;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Optional;
+import java.util.*;
+import java.util.stream.Collectors;
 
 public class GetPymooNSGA2Results {
     private static final Log log = LogFactory.getLog(GetPymooNSGA2Results.class);
 
-    public Optional<ExternalPlannerResponse> execute(List<BasinInflow> basinInflow, List<Damn> damnList) {
+    public Optional<ExternalPlannerResponse> execute(Map<String, Float> inflowVolume, List<Damn> damnList) {
         try {
+            //si todos los inflows son nulos no hago nada pq no llueve y no puedo hacer nada
+            if ( inflowVolume.values().stream().filter( f -> !Float.isNaN( f ) && f > 0).collect(Collectors.toList()).size() == 0) {
+                log.warn("[PymooLauncher] All inflows as 0");
+                return Optional.empty();
+            }
+
+            Map<String, Float> correctedVolumes = correctVolumes( inflowVolume );
+
+
             final String python_script = "template_reservoir_planner_pymoo.py";
-            File tempFile = File.createTempFile("tfm-", "py");
+            File tempFile = File.createTempFile("tfm-", ".py");
             URL pythonFileUrl =  Main.class.getResource("python/"  + python_script);
 
             BufferedReader br = new BufferedReader(new FileReader(pythonFileUrl.getFile()));
             PrintWriter pw =  new PrintWriter(new FileWriter(tempFile));
             String line = "";
             while ((line = br.readLine()) != null) {
-                pw.println( addDataToLine(line, basinInflow, damnList) );
+                pw.println( addDataToLine(line, correctedVolumes, damnList) );
                 pw.flush();
             }
 
             PythonCaller caller = new PythonCaller();
             final Optional<String> response =  caller.callAndWait( tempFile.getAbsolutePath() );
             ExternalPlannerResponse damnManagement = new ExternalPlannerResponse();
+            tempFile.delete();
 
             if (response.isEmpty()) {
                 return Optional.empty();
             }
 
-            List<DamnManagement> damnManagementList = getDamnManagementFromResponse( response.get() );
+            List<DamnManagement> damnManagementList = getDamnManagementFromResponse( response.get(), inflowVolume );
+            if (damnManagementList.isEmpty()) {
+                return Optional.empty();
+            }
+
             damnManagement.setDamnManagementList( damnManagementList );
+
+
 
             return Optional.of( damnManagement );
 
@@ -56,17 +71,32 @@ public class GetPymooNSGA2Results {
         return Optional.empty();
     }
 
-    private String addDataToLine(String line, List<BasinInflow> basinInflows, List<Damn> damnStatus) {
+    private Map<String, Float> correctVolumes(Map<String, Float> inflowVolume) {
+        final float minVolume = 0.000000001f;
+
+        Map<String, Float> correctedVolumes = new HashMap<>();
+        inflowVolume.keySet().forEach( basin -> {
+            if ( Float.isNaN( inflowVolume.get( basin) ) || inflowVolume.get( basin)<=0 ) {
+                correctedVolumes.put( basin, minVolume);
+            } else {
+                correctedVolumes.put( basin, inflowVolume.get(basin));
+            }
+        });
+
+        return  correctedVolumes;
+    }
+
+    private String addDataToLine(String line, Map<String, Float> inflowVolume, List<Damn> damnStatus) {
         if ( line.contains("%C1_INFLOW%")) {
-            return line.replace("%C1_INFLOW%", String.valueOf( basinInflows.stream().filter( b -> b.getBasin_id().equals("c1")).findAny().get().getMm() ) );
+            return line.replace("%C1_INFLOW%", String.valueOf( inflowVolume.get("c1") ) );
         }
 
         if ( line.contains("%C2_INFLOW%")) {
-            return line.replace("%C2_INFLOW%", String.valueOf( basinInflows.stream().filter( b -> b.getBasin_id().equals("c2")).findAny().get().getMm() ) );
+            return line.replace("%C2_INFLOW%", String.valueOf( inflowVolume.get("c2") ) );
         }
 
         if ( line.contains("%C3_INFLOW%")) {
-            return line.replace("%C3_INFLOW%", String.valueOf( basinInflows.stream().filter( b -> b.getBasin_id().equals("c3")).findAny().get().getMm() ) );
+            return line.replace("%C3_INFLOW%", String.valueOf( inflowVolume.get("c3") ) );
         }
 
         if ( line.contains("%C3_THRESHOLD%")) {
@@ -104,7 +134,7 @@ public class GetPymooNSGA2Results {
         return line;
     }
 
-    private List<DamnManagement> getDamnManagementFromResponse(String response) {
+    private List<DamnManagement> getDamnManagementFromResponse(String response, Map<String, Float> inflowVolume) {
         //Look for PREFIX X
         final String X_SOLUTION_PREFIX = "X-solution <==>";
         final String F_SOLUTION_PREFIX = "F-solution <==>";
@@ -131,18 +161,24 @@ public class GetPymooNSGA2Results {
             return new ArrayList<>();
         }
 
-        return readSolution(x_response, responseSelectedIndex);
+        return readSolution(x_response, responseSelectedIndex, inflowVolume);
     }
 
-    private List<DamnManagement> readSolution(String xResponse, int responseSelectedIndex) {
+    private List<DamnManagement> readSolution(String xResponse, int responseSelectedIndex, Map<String, Float> inflowVolume) {
         String[] responses = xResponse.split("]");
         String response = responses[responseSelectedIndex].replaceAll("\n", "").replaceAll("\\[", "").trim();
-        String[] solutionValues = response.split(" ");
+        String[] solutionValues = Arrays.asList( response.split(" ") ).stream().filter(str -> !str.isEmpty()).collect(Collectors.toList()).toArray(new String[0]);
 
         List<DamnManagement> ret = new ArrayList<>();
 
         for (int i = 0; i < solutionValues.length; i++) {
-            ret.add( new DamnManagement( BasinDefinition.BASINS.get(i), Float.parseFloat( solutionValues[i])) );
+            final String basinId = BasinDefinition.BASINS.get(i);
+
+            if ( Float.isNaN( inflowVolume.get(basinId) ) || inflowVolume.get(basinId) <= 0 ) {
+                ret.add( new DamnManagement(basinId , 0) );
+            } else {
+                ret.add( new DamnManagement(basinId , Float.parseFloat( solutionValues[i])) );
+            }
         }
 
         return ret;
