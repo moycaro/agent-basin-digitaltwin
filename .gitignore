@@ -36,7 +36,7 @@ build/
 
 ### Mac OS ###
 .DS_Store
-/src/main/resources/org/carol/tfm/data/SPE00156018.csv
-/src/main/resources/org/carol/tfm/data/SPE00156270.csv
-/src/main/resources/org/carol/tfm/data/SPE00156153.csv
+/src/main/resources/org/carol/tfm/data/flood/SPE00156018.csv
+/src/main/resources/org/carol/tfm/data/flood/SPE00156270.csv
+/src/main/resources/org/carol/tfm/data/flood/SPE00156153.csv
 /.idea/vcs.xml

@@ -117,7 +117,7 @@ public class Pluvio extends Agent implements BeliefListener {
 
     /**
      Inner class SendDataBehaviour.
-     This is the behaviour used by Gauge agents to send data to a planner
+     This is the behaviour used by RainfallGauge agents to send data to a planner
      */
     private void sendDataBehaviour(int step) {
         ACLMessage info = new ACLMessage(ACLMessage.INFORM);

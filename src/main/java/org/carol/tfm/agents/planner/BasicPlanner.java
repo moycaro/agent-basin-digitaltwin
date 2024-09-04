@@ -259,6 +259,19 @@ public class BasicPlanner extends Agent implements GoalListener, BeliefListener 
         Integer time_step = (Integer) timeStepBelieveBase.getBelief(BeliefNames.TIME_STEP).getValue();
         log.info( "[BASIC PLANNER] Updating plan for STEP " + time_step);
 
+        Damn myDamn = (Damn) this.beliefBase.get( "c1" ).getBelief( BeliefNames.DAMN_STATUS ).getValue();
+        DataExportService.appendLineToReservoirC1("" + myDamn.getCurrent_volume() );
+        myDamn = (Damn) this.beliefBase.get( "c2" ).getBelief( BeliefNames.DAMN_STATUS ).getValue();
+        DataExportService.appendLineToReservoirC2("" + myDamn.getCurrent_volume() );
+        myDamn = (Damn) this.beliefBase.get( "c3" ).getBelief( BeliefNames.DAMN_STATUS ).getValue();
+        DataExportService.appendLineToReservoirC3("" + myDamn.getCurrent_volume() );
+
+        Float myOutflow = (Float) this.beliefBase.get( "c3" ).getBelief( BeliefNames.BASIN_OUTFLOW).getValue();
+        DataExportService.appendLineToAforoC3("" + myOutflow );
+        myOutflow = (Float) this.beliefBase.get( "c4" ).getBelief( BeliefNames.BASIN_OUTFLOW).getValue();
+        DataExportService.appendLineToAforoC4("" + myOutflow );
+
+
         //Primero las cuencas de cabecera
         List<BasinConfig> headerBasins = BasinDefinition.BASINS_CONFIG.values().stream().filter(c -> c.is_header ).collect(Collectors.toList());
         headerBasins.forEach( basinConfig -> {

@@ -27,6 +27,7 @@ import org.carol.tfm.domain.capabilities.basic_water_manager.beliefs.BeliefNames
 import org.carol.tfm.domain.entities.Damn;
 import org.carol.tfm.domain.ontology.BasinDefinition;
 import org.carol.tfm.domain.ontology.configs.BasinConfig;
+import org.carol.tfm.domain.services.DataExportService;
 import org.carol.tfm.external_planners.application.GetPymooNSGA2Results;
 import org.carol.tfm.external_planners.domain.entities.DamnManagement;
 import org.carol.tfm.external_planners.domain.entities.ExternalPlannerResponse;
@@ -185,7 +186,8 @@ public class PymooPlanner extends Agent implements GoalListener, BeliefListener 
             Damn myDamn = (Damn) this.beliefBase.get( "c1" ).getBelief( BeliefNames.DAMN_STATUS ).getValue();
             float currentVolume = myDamn.getCurrent_volume() + planToStorage;
             myDamn.setCurrent_volume( currentVolume );
-            this.beliefBase.get("c1").updateBelief( BeliefNames.DAMN_STATUS, myDamn );
+            this.beliefBase.get("c1").updateBelief( BeliefNames. DAMN_STATUS, myDamn );
+DataExportService.appendLineToReservoirC1("" + myDamn.getCurrent_volume() );
 
         // C2 Cuenca de cabecera
         Float myInflow2 = (Float) this.beliefBase.get( "c2" ).getBelief( BeliefNames.BASIN_INFLOW).getValue();
@@ -204,6 +206,7 @@ public class PymooPlanner extends Agent implements GoalListener, BeliefListener 
             float currentVolume2 = myDamn2.getCurrent_volume() + planToStorage2;
             myDamn2.setCurrent_volume( currentVolume2 );
             this.beliefBase.get("c2").updateBelief( BeliefNames.DAMN_STATUS, myDamn2 );
+DataExportService.appendLineToReservoirC2("" + myDamn2.getCurrent_volume() );
 
         // C3 Cuenca intermedia
         Float myInflow3 = (Float) this.beliefBase.get( "c3" ).getBelief( BeliefNames.BASIN_INFLOW).getValue();
@@ -222,6 +225,7 @@ public class PymooPlanner extends Agent implements GoalListener, BeliefListener 
             float currentVolume3 = myDamn3.getCurrent_volume() + planToStorage3;
             myDamn3.setCurrent_volume( currentVolume3 );
             this.beliefBase.get("c3").updateBelief( BeliefNames.DAMN_STATUS, myDamn3 );
+DataExportService.appendLineToReservoirC3("" + myDamn3.getCurrent_volume() );
 
         // C4 Cuenca de cierre
         final float inflowVolumeAdjusted4 = released_water3;

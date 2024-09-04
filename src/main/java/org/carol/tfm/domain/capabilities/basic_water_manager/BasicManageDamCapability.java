@@ -33,18 +33,16 @@ public class BasicManageDamCapability extends Capability {
     private Damn damn_status;
     @Belief
     private Float basin_inflow;
+    Optional<ReservoirConfig> reservoirConfig;
+    String basin_id;
+
 
     @Plan
     private bdi4jade.plan.Plan inputOutputPlan;
-
     @Plan
     private bdi4jade.plan.Plan storageWaterPlan;
-
     @Plan
     private bdi4jade.plan.Plan regimeNaturalPlan;
-
-    Optional<ReservoirConfig> reservoirConfig;
-    String basin_id;
 
     public BasicManageDamCapability(String basin_id, Optional<ReservoirConfig> config) {
         this.basin_id = basin_id;
@@ -64,7 +62,7 @@ public class BasicManageDamCapability extends Capability {
     @Override
     protected void setup() {
         //HOTstart = false
-        this.basin_status = BasinStatus.BASIN_STATUS_TYPES.SCARCITY;
+        this.basin_status = BasinStatus.BASIN_STATUS_TYPES.FLOOD;
         this.basin_rainfall = 0f;
         this.basin_inflow = 0f;
         this.basin_outflow = 0f;
@@ -72,6 +70,15 @@ public class BasicManageDamCapability extends Capability {
             log.warn(" La cuenca " + this.basin_id + " no tiene elementos de gestión.");
             this.damn_status = null;
         } else {
+          /*  if ( this.basin_id.equals("c3")) {
+                this.damn_status = new Damn( basin_id, this.reservoirConfig.get().volumen_total, 152.3f );
+            } else if ( this.basin_id.equals("c2")) {
+                this.damn_status = new Damn( basin_id, this.reservoirConfig.get().volumen_total, 15 );
+            } else {
+
+                this.damn_status = new Damn( basin_id, this.reservoirConfig.get().volumen_total, 10 );
+            }*/
+
             this.damn_status = new Damn( basin_id, this.reservoirConfig.get().volumen_total, 0 );
         }
 
